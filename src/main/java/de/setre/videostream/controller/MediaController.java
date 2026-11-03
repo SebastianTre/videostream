@@ -1,4 +1,3 @@
-
 package de.setre.videostream.controller;
 
 import de.setre.videostream.dto.MediaItemDto;
@@ -12,6 +11,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
+
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import java.nio.file.Path;
+import java.nio.file.Files;
 
 @RestController
 @RequestMapping("/api/media")
@@ -41,6 +48,39 @@ public class MediaController {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Fehler beim Lesen des Medienverzeichnisses"
+            );
+        }
+    }
+
+    @GetMapping("/stream")
+    public ResponseEntity<Resource> streamVideo(
+            @RequestParam String path) {
+
+        try {
+            Path videoPath = mediaService.getVideoPath(path);
+
+            Resource resource = new FileSystemResource(videoPath);
+
+            String contentType = Files.probeContentType(videoPath);
+
+            MediaType mediaType = contentType != null
+                    ? MediaType.parseMediaType(contentType)
+                    : MediaType.APPLICATION_OCTET_STREAM;
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .body(resource);
+
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    e.getMessage()
+            );
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Videodatei konnte nicht gelesen werden"
             );
         }
     }

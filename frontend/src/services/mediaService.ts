@@ -20,3 +20,14 @@ export async function getMediaItems(
 
   return response.json() as Promise<MediaItem[]>
 }
+
+export function getVideoStreamUrl(
+  path: string
+): string {
+
+  const params = new URLSearchParams()
+
+  params.set('path', path)
+
+  return `/api/media/stream?${params.toString()}`
+}

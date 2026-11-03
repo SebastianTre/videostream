@@ -1,6 +1,9 @@
 
 import { useEffect, useState } from 'react'
-import { getMediaItems } from './services/mediaService'
+import {
+  getMediaItems,
+  getVideoStreamUrl
+} from './services/mediaService'
 import type { MediaItem } from './types/media'
 import './App.css'
 
@@ -10,6 +13,10 @@ function App() {
   const [currentPath, setCurrentPath] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Aktuell ausgewähltes Video
+  const [selectedVideo, setSelectedVideo] =
+    useState<MediaItem | null>(null)
 
   async function loadMedia(path: string) {
     setLoading(true)
@@ -38,6 +45,16 @@ function App() {
     void loadMedia(path)
   }
 
+  // Video auswählen und Player anzeigen
+  function playVideo(video: MediaItem) {
+    setSelectedVideo(video)
+  }
+
+  // Player schließen und Medienübersicht anzeigen
+  function closeVideo() {
+    setSelectedVideo(null)
+  }
+
   function formatSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes'
 
@@ -62,85 +79,130 @@ function App() {
 
       <main className="content">
 
-        <nav className="breadcrumb">
-          <button onClick={() => navigateToPath('')}>
-            Medien
-          </button>
+        {selectedVideo ? (
 
-          {pathParts.map((part, index) => {
+          <div className="video-player">
 
-            const path = pathParts
-              .slice(0, index + 1)
-              .join('/')
+            <button
+              className="back-button"
+              onClick={closeVideo}
+            >
+              ← Zurück zur Medienübersicht
+            </button>
 
-            return (
-              <span key={path}>
-                <span className="separator"> / </span>
+            <h2>{selectedVideo.name}</h2>
 
-                <button onClick={() => navigateToPath(path)}>
-                  {part}
-                </button>
-              </span>
-            )
-          })}
-        </nav>
+            <video
+              className="video-element"
+              controls
+              autoPlay
+              playsInline
+              src={getVideoStreamUrl(
+                selectedVideo.relativePath
+              )}
+            >
+              Dein Browser unterstützt keine Videowiedergabe.
+            </video>
 
-        <h2>
-          {pathParts.length > 0
-            ? pathParts[pathParts.length - 1]
-            : 'Alle Medien'}
-        </h2>
+          </div>
 
-        {loading && <p>Medien werden geladen...</p>}
+        ) : (
 
-        {error && <p className="error">{error}</p>}
+          <>
 
-        {!loading && !error && (
-          <div className="media-list">
+            <nav className="breadcrumb">
 
-            {items.map(item => (
+              <button onClick={() => navigateToPath('')}>
+                Medien
+              </button>
 
-              <div
-                key={item.relativePath}
-                className="media-item"
-                onClick={() => {
-                  if (item.directory) {
-                    openFolder(item)
-                  }
-                }}
-              >
+              {pathParts.map((part, index) => {
 
-                <div className="media-icon">
-                  {item.directory ? '📁' : '🎬'}
-                </div>
+                const path = pathParts
+                  .slice(0, index + 1)
+                  .join('/')
 
-                <div className="media-info">
-                  <div className="media-name">
-                    {item.name}
+                return (
+                  <span key={path}>
+                    <span className="separator"> / </span>
+
+                    <button onClick={() => navigateToPath(path)}>
+                      {part}
+                    </button>
+                  </span>
+                )
+              })}
+
+            </nav>
+
+            <h2>
+              {pathParts.length > 0
+                ? pathParts[pathParts.length - 1]
+                : 'Alle Medien'}
+            </h2>
+
+            {loading && <p>Medien werden geladen...</p>}
+
+            {error && <p className="error">{error}</p>}
+
+            {!loading && !error && (
+
+              <div className="media-list">
+
+                {items.map(item => (
+
+                  <div
+                    key={item.relativePath}
+                    className="media-item"
+                    onClick={() => {
+
+                      if (item.directory) {
+                        openFolder(item)
+                      } else {
+                        playVideo(item)
+                      }
+
+                    }}
+                  >
+
+                    <div className="media-icon">
+                      {item.directory ? '📁' : '🎬'}
+                    </div>
+
+                    <div className="media-info">
+
+                      <div className="media-name">
+                        {item.name}
+                      </div>
+
+                      <div className="media-details">
+                        {item.directory
+                          ? 'Ordner'
+                          : formatSize(item.size)}
+                      </div>
+
+                    </div>
+
+                    {item.directory && (
+                      <div className="media-arrow">
+                        ›
+                      </div>
+                    )}
+
                   </div>
 
-                  <div className="media-details">
-                    {item.directory
-                      ? 'Ordner'
-                      : formatSize(item.size)}
-                  </div>
-                </div>
+                ))}
 
-                {item.directory && (
-                  <div className="media-arrow">
-                    ›
-                  </div>
+                {items.length === 0 && (
+                  <p>Dieser Ordner ist leer.</p>
                 )}
 
               </div>
 
-            ))}
-
-            {items.length === 0 && (
-              <p>Dieser Ordner ist leer.</p>
             )}
 
-          </div>
+          </>
+
         )}
 
       </main>

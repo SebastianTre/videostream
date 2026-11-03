@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import java.nio.file.LinkOption;
+
 @Service
 public class MediaService {
 
@@ -119,5 +121,53 @@ public class MediaService {
                 .toLowerCase();
 
         return VIDEO_EXTENSIONS.contains(extension);
+    }
+
+    public Path getVideoPath(String relativePath) {
+
+        Path rootPath = mediaProperties.getRootPath()
+                .toAbsolutePath()
+                .normalize();
+
+        Path videoPath = rootPath.resolve(relativePath)
+                .normalize();
+
+        // Zugriff außerhalb des Medienordners verhindern
+        if (!videoPath.startsWith(rootPath)) {
+            throw new IllegalArgumentException(
+                    "Ungültiger Medienpfad"
+            );
+        }
+
+        // Symbolische Links nicht außerhalb des Medienordners zulassen
+        try {
+            Path realRoot = rootPath.toRealPath();
+            Path realVideo = videoPath.toRealPath();
+
+            if (!realVideo.startsWith(realRoot)) {
+                throw new IllegalArgumentException(
+                        "Zugriff außerhalb des Medienordners nicht erlaubt"
+                );
+            }
+
+            if (!Files.isRegularFile(realVideo, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IllegalArgumentException(
+                        "Datei ist keine gültige Videodatei"
+                );
+            }
+
+            if (!isVideoFile(realVideo)) {
+                throw new IllegalArgumentException(
+                        "Dateiformat wird nicht unterstützt"
+                );
+            }
+
+            return realVideo;
+
+        } catch (IOException e) {
+            throw new IllegalArgumentException(
+                    "Videodatei konnte nicht gefunden werden"
+            );
+        }
     }
 }

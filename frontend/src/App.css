@@ -99,3 +99,30 @@
     padding: 12px;
   }
 }
+
+.video-player {
+  width: 100%;
+}
+
+.back-button {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 16px;
+}
+
+.back-button:hover {
+  text-decoration: underline;
+}
+
+.video-element {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  background: #000;
+  border-radius: 8px;
+  object-fit: contain;
+}
