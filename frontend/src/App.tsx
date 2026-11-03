@@ -5,7 +5,15 @@ import {
   getVideoStreamUrl
 } from './services/mediaService'
 import type { MediaItem } from './types/media'
+import Header from './components/Header'
+import MediaGrid from './components/MediaGrid'
 import './App.css'
+
+type SortOption =
+  | 'name-asc'
+  | 'name-desc'
+  | 'size-asc'
+  | 'size-desc'
 
 function App() {
 
@@ -13,6 +21,9 @@ function App() {
   const [currentPath, setCurrentPath] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortOption, setSortOption] =
+    useState<SortOption>('name-asc')
 
   // Aktuell ausgewähltes Video
   const [selectedVideo, setSelectedVideo] =
@@ -26,6 +37,7 @@ function App() {
       const data = await getMediaItems(path)
       setItems(data)
       setCurrentPath(path)
+      setSearchTerm('')
     } catch {
       setError('Medien konnten nicht geladen werden.')
     } finally {
@@ -70,12 +82,49 @@ function App() {
     ? currentPath.split('/')
     : []
 
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(
+      searchTerm.toLowerCase()
+    )
+  )
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
+
+    // Ordner immer zuerst
+    if (a.directory !== b.directory) {
+      return a.directory ? -1 : 1
+    }
+
+    switch (sortOption) {
+
+      case 'name-asc':
+        return a.name.localeCompare(b.name, 'de', {
+          sensitivity: 'base'
+        })
+
+      case 'name-desc':
+        return b.name.localeCompare(a.name, 'de', {
+          sensitivity: 'base'
+        })
+
+      case 'size-asc':
+        return a.size - b.size
+
+      case 'size-desc':
+        return b.size - a.size
+
+      default:
+        return 0
+    }
+  })
+
   return (
     <div className="app">
 
-      <header className="header">
-        <h1>🎬 VideoStream</h1>
-      </header>
+      <Header
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
 
       <main className="content">
 
@@ -145,61 +194,55 @@ function App() {
 
             {error && <p className="error">{error}</p>}
 
+
             {!loading && !error && (
 
-              <div className="media-list">
+              <>
 
-                {items.map(item => (
+                <div className="media-toolbar">
 
-                  <div
-                    key={item.relativePath}
-                    className="media-item"
-                    onClick={() => {
+                  <div className="media-count">
+                    {sortedItems.length} Einträge
+                  </div>
 
-                      if (item.directory) {
-                        openFolder(item)
-                      } else {
-                        playVideo(item)
+                  <div className="sort-control">
+
+                    <label htmlFor="media-sort">
+                      Sortieren:
+                    </label>
+
+                    <select
+                      id="media-sort"
+                      value={sortOption}
+                      onChange={(event) =>
+                        setSortOption(event.target.value as SortOption)
                       }
-
-                    }}
-                  >
-
-                    <div className="media-icon">
-                      {item.directory ? '📁' : '🎬'}
-                    </div>
-
-                    <div className="media-info">
-
-                      <div className="media-name">
-                        {item.name}
-                      </div>
-
-                      <div className="media-details">
-                        {item.directory
-                          ? 'Ordner'
-                          : formatSize(item.size)}
-                      </div>
-
-                    </div>
-
-                    {item.directory && (
-                      <div className="media-arrow">
-                        ›
-                      </div>
-                    )}
+                    >
+                      <option value="name-asc">Name (A–Z)</option>
+                      <option value="name-desc">Name (Z–A)</option>
+                      <option value="size-asc">Größe (klein–groß)</option>
+                      <option value="size-desc">Größe (groß–klein)</option>
+                    </select>
 
                   </div>
 
-                ))}
+                </div>
 
-                {items.length === 0 && (
-                  <p>Dieser Ordner ist leer.</p>
-                )}
+                <MediaGrid
+                  items={sortedItems}
+                  onItemClick={(item) => {
+                    if (item.directory) {
+                      openFolder(item)
+                    } else {
+                      playVideo(item)
+                    }
+                  }}
+                />
 
-              </div>
+              </>
 
             )}
+
 
           </>
 
