@@ -7,6 +7,7 @@ import {
 import type { MediaItem } from './types/media'
 import Header from './components/Header'
 import MediaGrid from './components/MediaGrid'
+import VideoPlayer from './components/VideoPlayer'
 import './App.css'
 
 type SortOption =
@@ -215,30 +216,10 @@ function App() {
 
         {selectedVideo ? (
 
-          <div className="video-player">
-
-            <button
-              className="back-button"
-              onClick={closeVideo}
-            >
-              ← Zurück zur Medienübersicht
-            </button>
-
-            <h2>{selectedVideo.name}</h2>
-
-            <video
-              className="video-element"
-              controls
-              autoPlay
-              playsInline
-              src={getVideoStreamUrl(
-                selectedVideo.relativePath
-              )}
-            >
-              Dein Browser unterstützt keine Videowiedergabe.
-            </video>
-
-          </div>
+          <VideoPlayer
+              video={selectedVideo}
+              onClose={closeVideo}
+          />
 
         ) : (
 

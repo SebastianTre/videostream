@@ -1,6 +1,8 @@
 package de.setre.videostream.controller;
 
 import de.setre.videostream.dto.MediaItemDto;
+import de.setre.videostream.service.MediaMetadataService;
+import de.setre.videostream.dto.MediaMetadataDto;
 import de.setre.videostream.service.MediaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +27,14 @@ import java.nio.file.Files;
 public class MediaController {
 
     private final MediaService mediaService;
+    private final MediaMetadataService mediaMetadataService;
 
-    public MediaController(MediaService mediaService) {
+    public MediaController(
+            MediaService mediaService,
+            MediaMetadataService mediaMetadataService) {
+
         this.mediaService = mediaService;
+        this.mediaMetadataService = mediaMetadataService;
     }
 
     @GetMapping
@@ -81,6 +88,38 @@ public class MediaController {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Videodatei konnte nicht gelesen werden"
+            );
+        }
+    }
+
+    @GetMapping("/metadata")
+    public MediaMetadataDto getMetadata(
+            @RequestParam String path) {
+
+        try {
+            return mediaMetadataService.getMetadata(path);
+
+        } catch (IllegalArgumentException e) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    e.getMessage()
+            );
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Metadatenanalyse wurde unterbrochen"
+            );
+
+        } catch (IOException e) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Videometadaten konnten nicht ermittelt werden"
             );
         }
     }
