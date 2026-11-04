@@ -1,7 +1,17 @@
 
-import { useEffect, useRef } from 'react'
-import type { MediaItem } from '../types/media'
-import { getVideoStreamUrl } from '../services/mediaService'
+import { useEffect, useRef, useState } from 'react'
+
+import type {
+  MediaItem,
+  MediaMetadata
+} from '../types/media'
+
+import {
+  getVideoStreamUrl,
+  getMediaMetadata
+} from '../services/mediaService'
+
+import MediaTechnicalInfo from './MediaTechnicalInfo'
 
 interface VideoPlayerProps {
   video: MediaItem
@@ -21,7 +31,9 @@ const DEFAULT_SETTINGS: PlayerSettings = {
 }
 
 function getPlayerSettings(): PlayerSettings {
+
   try {
+
     const saved = localStorage.getItem(SETTINGS_KEY)
 
     if (!saved) {
@@ -55,10 +67,64 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
 
   const lastSavedTime = useRef(0)
 
+  const [metadata, setMetadata] =
+    useState<MediaMetadata | null>(null)
+
+  const [metadataLoading, setMetadataLoading] =
+    useState(true)
+
+  const [metadataError, setMetadataError] =
+    useState<string | null>(null)
+
   const progressKey =
     `videostream-progress:${video.relativePath}`
 
-  // Player-Einstellungen beim Öffnen wiederherstellen
+  // Metadaten laden
+  useEffect(() => {
+
+    let cancelled = false
+
+    async function loadMetadata() {
+
+      setMetadata(null)
+      setMetadataLoading(true)
+      setMetadataError(null)
+
+      try {
+
+        const result = await getMediaMetadata(
+          video.relativePath
+        )
+
+        if (!cancelled) {
+          setMetadata(result)
+        }
+
+      } catch {
+
+        if (!cancelled) {
+          setMetadataError(
+            'Technische Medieninformationen konnten nicht geladen werden.'
+          )
+        }
+
+      } finally {
+
+        if (!cancelled) {
+          setMetadataLoading(false)
+        }
+      }
+    }
+
+    void loadMetadata()
+
+    return () => {
+      cancelled = true
+    }
+
+  }, [video.relativePath])
+
+  // Player-Einstellungen wiederherstellen
   useEffect(() => {
 
     const player = videoRef.current
@@ -80,6 +146,7 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
     if (!player) return
 
     try {
+
       const savedProgress = localStorage.getItem(progressKey)
 
       if (!savedProgress) return
@@ -91,12 +158,16 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
         position > 0 &&
         position < player.duration
       ) {
+
         player.currentTime = position
         lastSavedTime.current = position
       }
 
     } catch {
-      console.warn('Wiedergabeposition konnte nicht geladen werden.')
+
+      console.warn(
+        'Wiedergabeposition konnte nicht geladen werden.'
+      )
     }
   }
 
@@ -111,7 +182,6 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
 
     const currentTime = player.currentTime
 
-    // Nur alle 5 Sekunden speichern
     if (
       !force &&
       currentTime - lastSavedTime.current < 5
@@ -120,6 +190,7 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
     }
 
     try {
+
       localStorage.setItem(
         progressKey,
         String(currentTime)
@@ -128,11 +199,14 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
       lastSavedTime.current = currentTime
 
     } catch {
-      console.warn('Wiedergabeposition konnte nicht gespeichert werden.')
+
+      console.warn(
+        'Wiedergabeposition konnte nicht gespeichert werden.'
+      )
     }
   }
 
-  // Lautstärke und Stummschaltung speichern
+  // Player-Einstellungen speichern
   function savePlayerSettings() {
 
     const player = videoRef.current
@@ -145,12 +219,17 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
     }
 
     try {
+
       localStorage.setItem(
         SETTINGS_KEY,
         JSON.stringify(settings)
       )
+
     } catch {
-      console.warn('Player-Einstellungen konnten nicht gespeichert werden.')
+
+      console.warn(
+        'Player-Einstellungen konnten nicht gespeichert werden.'
+      )
     }
   }
 
@@ -158,9 +237,14 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
   function handleEnded() {
 
     try {
+
       localStorage.removeItem(progressKey)
+
     } catch {
-      console.warn('Wiedergabeposition konnte nicht gelöscht werden.')
+
+      console.warn(
+        'Wiedergabeposition konnte nicht gelöscht werden.'
+      )
     }
 
     lastSavedTime.current = 0
@@ -198,6 +282,24 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
       >
         Dein Browser unterstützt keine Videowiedergabe.
       </video>
+
+      {/* Technische Medieninformationen */}
+
+      <div className="media-metadata-container">
+
+        {metadataLoading && (
+          <p>Medieninformationen werden geladen...</p>
+        )}
+
+        {metadataError && (
+          <p className="error">{metadataError}</p>
+        )}
+
+        {metadata && (
+          <MediaTechnicalInfo metadata={metadata} />
+        )}
+
+      </div>
 
     </div>
   )

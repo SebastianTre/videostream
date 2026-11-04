@@ -403,3 +403,79 @@
   }
 
 }
+
+
+.technical-info {
+  margin-top: 24px;
+  padding: 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.technical-info h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.technical-info h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.technical-info h4 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.technical-section {
+  margin-top: 28px;
+}
+
+.technical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.technical-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.technical-info-item span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.technical-info-item strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.technical-track {
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.technical-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 4px;
+}
+
+.media-metadata-container {
+  margin-top: 20px;
+  width: 100%;
+}

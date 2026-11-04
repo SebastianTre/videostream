@@ -1,4 +1,5 @@
 import type { MediaItem } from '../types/media'
+import type { MediaMetadata } from '../types/media'
 
 export async function getMediaItems(
   path: string = ''
@@ -30,4 +31,22 @@ export function getVideoStreamUrl(
   params.set('path', path)
 
   return `/api/media/stream?${params.toString()}`
+}
+
+export async function getMediaMetadata(
+  path: string
+): Promise<MediaMetadata> {
+
+  const params = new URLSearchParams()
+  params.set('path', path)
+
+  const response = await fetch(
+    `/api/media/metadata?${params.toString()}`
+  )
+
+  if (!response.ok) {
+    throw new Error('Medieninformationen konnten nicht geladen werden')
+  }
+
+  return response.json() as Promise<MediaMetadata>
 }
