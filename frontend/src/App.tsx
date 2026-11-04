@@ -15,29 +15,101 @@ type SortOption =
   | 'size-asc'
   | 'size-desc'
 
+interface AppState {
+  currentPath: string
+  selectedVideo: MediaItem | null
+  searchTerm: string
+  sortOption: SortOption
+}
+
+const STORAGE_KEY = 'videostream-app-state'
+
+function getInitialState(): AppState {
+  const defaultState: AppState = {
+    currentPath: '',
+    selectedVideo: null,
+    searchTerm: '',
+    sortOption: 'name-asc'
+  }
+
+  try {
+    const savedState = localStorage.getItem(STORAGE_KEY)
+
+    if (!savedState) {
+      return defaultState
+    }
+
+    const parsed = JSON.parse(savedState) as Partial<AppState>
+
+    const validSortOptions: SortOption[] = [
+      'name-asc',
+      'name-desc',
+      'size-asc',
+      'size-desc'
+    ]
+
+    return {
+      currentPath:
+        typeof parsed.currentPath === 'string'
+          ? parsed.currentPath
+          : '',
+
+      selectedVideo:
+        parsed.selectedVideo &&
+        typeof parsed.selectedVideo.relativePath === 'string' &&
+        typeof parsed.selectedVideo.name === 'string' &&
+        parsed.selectedVideo.directory === false
+          ? parsed.selectedVideo
+          : null,
+
+      searchTerm:
+        typeof parsed.searchTerm === 'string'
+          ? parsed.searchTerm
+          : '',
+
+      sortOption:
+        validSortOptions.includes(parsed.sortOption as SortOption)
+          ? parsed.sortOption as SortOption
+          : 'name-asc'
+    }
+
+  } catch {
+    return defaultState
+  }
+}
+
 function App() {
 
+  const [initialState] = useState(getInitialState)
+
   const [items, setItems] = useState<MediaItem[]>([])
-  const [currentPath, setCurrentPath] = useState('')
+  const [currentPath, setCurrentPath] =
+    useState(initialState.currentPath)
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
+
+  const [searchTerm, setSearchTerm] =
+    useState(initialState.searchTerm)
+
   const [sortOption, setSortOption] =
-    useState<SortOption>('name-asc')
+    useState<SortOption>(initialState.sortOption)
 
-  // Aktuell ausgewähltes Video
   const [selectedVideo, setSelectedVideo] =
-    useState<MediaItem | null>(null)
+    useState<MediaItem | null>(initialState.selectedVideo)
 
+  // Medienordner laden
   async function loadMedia(path: string) {
+
     setLoading(true)
     setError(null)
 
     try {
       const data = await getMediaItems(path)
+
       setItems(data)
       setCurrentPath(path)
-      setSearchTerm('')
+
     } catch {
       setError('Medien konnten nicht geladen werden.')
     } finally {
@@ -45,37 +117,51 @@ function App() {
     }
   }
 
+  // Initialen Ordner laden
   useEffect(() => {
-    void loadMedia('')
+    void loadMedia(initialState.currentPath)
   }, [])
 
+  // Anwendungszustand speichern
+  useEffect(() => {
+
+    const appState: AppState = {
+      currentPath,
+      selectedVideo,
+      searchTerm,
+      sortOption
+    }
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(appState)
+    )
+
+  }, [
+    currentPath,
+    selectedVideo,
+    searchTerm,
+    sortOption
+  ])
+
   function openFolder(folder: MediaItem) {
+    setSelectedVideo(null)
+    setSearchTerm('')
     void loadMedia(folder.relativePath)
   }
 
   function navigateToPath(path: string) {
+    setSelectedVideo(null)
+    setSearchTerm('')
     void loadMedia(path)
   }
 
-  // Video auswählen und Player anzeigen
   function playVideo(video: MediaItem) {
     setSelectedVideo(video)
   }
 
-  // Player schließen und Medienübersicht anzeigen
   function closeVideo() {
     setSelectedVideo(null)
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes'
-
-    const units = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-    const index = Math.floor(Math.log(bytes) / Math.log(1024))
-
-    const size = bytes / Math.pow(1024, index)
-
-    return `${size.toFixed(1)} ${units[index]}`
   }
 
   const pathParts = currentPath
@@ -90,7 +176,6 @@ function App() {
 
   const sortedItems = [...filteredItems].sort((a, b) => {
 
-    // Ordner immer zuerst
     if (a.directory !== b.directory) {
       return a.directory ? -1 : 1
     }
@@ -194,7 +279,6 @@ function App() {
 
             {error && <p className="error">{error}</p>}
 
-
             {!loading && !error && (
 
               <>
@@ -242,7 +326,6 @@ function App() {
               </>
 
             )}
-
 
           </>
 
