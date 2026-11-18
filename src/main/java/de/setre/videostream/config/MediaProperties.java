@@ -12,6 +12,8 @@ public class MediaProperties {
 
     private String ffprobePath;
 
+    private String ffmpegPath;
+
     public Path getRootPath() {
         return rootPath;
     }
@@ -26,5 +28,13 @@ public class MediaProperties {
 
     public void setFfprobePath(String ffprobePath) {
         this.ffprobePath = ffprobePath;
+    }
+
+    public String getFfmpegPath() {
+        return ffmpegPath;
+    }
+
+    public void setFfmpegPath(String ffmpegPath) {
+        this.ffmpegPath = ffmpegPath;
     }
 }

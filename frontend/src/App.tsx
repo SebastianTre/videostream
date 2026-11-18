@@ -1,9 +1,6 @@
 
 import { useEffect, useState } from 'react'
-import {
-  getMediaItems,
-  getVideoStreamUrl
-} from './services/mediaService'
+import { getMediaItems } from './services/mediaService'
 import type { MediaItem } from './types/media'
 import Header from './components/Header'
 import MediaGrid from './components/MediaGrid'

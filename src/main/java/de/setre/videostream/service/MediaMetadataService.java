@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.Locale;
 
 @Service
 public class MediaMetadataService {
@@ -22,18 +23,22 @@ public class MediaMetadataService {
     private final MediaProperties mediaProperties;
     private final MediaService mediaService;
     private final JsonMapper objectMapper;
+    private final AudioTrackSelectionService audioTrackSelectionService;
 
     public MediaMetadataService(
             MediaProperties mediaProperties,
             MediaService mediaService,
-            JsonMapper objectMapper) {
+            JsonMapper objectMapper,
+            AudioTrackSelectionService audioTrackSelectionService) {
 
         this.mediaProperties = mediaProperties;
         this.mediaService = mediaService;
         this.objectMapper = objectMapper;
+        this.audioTrackSelectionService = audioTrackSelectionService;
     }
 
-    public MediaMetadataDto getMetadata(String relativePath)
+    public MediaMetadataDto getMetadata(String relativePath,
+                                        List<String> languages)
             throws IOException, InterruptedException {
 
         Path videoPath = mediaService.getVideoPath(relativePath);
@@ -117,7 +122,7 @@ public class MediaMetadataService {
                     outputFile.toFile()
             );
 
-            return mapMetadata(videoPath, root);
+            return mapMetadata(videoPath, root, languages);
 
         } finally {
 
@@ -127,7 +132,8 @@ public class MediaMetadataService {
 
     private MediaMetadataDto mapMetadata(
             Path videoPath,
-            JsonNode root) throws IOException {
+            JsonNode root,
+            List<String> languages) throws IOException {
 
         JsonNode format = root.path("format");
 
@@ -246,6 +252,24 @@ public class MediaMetadataService {
             }
         }
 
+        List<Locale.LanguageRange> preferredLanguages =
+                languages == null || languages.isEmpty()
+                        ? List.of()
+                        : Locale.LanguageRange.parse(
+                        String.join(",", languages)
+                );
+
+        MediaMetadataDto.AudioTrack selectedAudioTrack =
+                audioTrackSelectionService.selectAudioTrack(
+                        audioTracks,
+                        preferredLanguages
+                );
+
+        Integer selectedAudioTrackIndex =
+                selectedAudioTrack != null
+                        ? selectedAudioTrack.index()
+                        : null;
+
         return new MediaMetadataDto(
                 videoPath.getFileName().toString(),
                 Files.size(videoPath),
@@ -255,7 +279,8 @@ public class MediaMetadataService {
                 formatBitrate,
                 videoStreams,
                 audioTracks,
-                subtitleTracks
+                subtitleTracks,
+                selectedAudioTrackIndex
         );
     }
 

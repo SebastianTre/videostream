@@ -57,6 +57,8 @@ export interface MediaMetadata {
   formatLongName: string | null
   bitrate: number | null
 
+  selectedAudioTrackIndex: number | null
+
   videoStreams: VideoStream[]
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrack[]

@@ -14,7 +14,9 @@ public record MediaMetadataDto(
 
         List<VideoStream> videoStreams,
         List<AudioTrack> audioTracks,
-        List<SubtitleTrack> subtitleTracks
+        List<SubtitleTrack> subtitleTracks,
+
+        Integer selectedAudioTrackIndex
 ) {
 
     public record VideoStream(
