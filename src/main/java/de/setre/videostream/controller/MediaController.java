@@ -162,7 +162,8 @@ public class MediaController {
 
             return hlsStreamingService.start(
                     request.path(),
-                    request.audioTrackIndex()
+                    request.audioTrackIndex(),
+                    request.audioMode()
             );
 
         } catch (IllegalArgumentException e) {
@@ -183,9 +184,13 @@ public class MediaController {
 
         } catch (IOException e) {
 
+            e.printStackTrace();
+
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "HLS-Stream konnte nicht gestartet werden"
+                            + e.getMessage(),
+                    e
             );
         }
     }

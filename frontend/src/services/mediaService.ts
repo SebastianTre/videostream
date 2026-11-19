@@ -74,6 +74,7 @@ export interface HlsAudioRequest {
 /**
  * Startet eine neue HLS-Wiedergabesitzung.
  */
+
 export async function startHlsSession(
   request: HlsStartRequest
 ): Promise<HlsSession> {
@@ -87,11 +88,17 @@ export async function startHlsSession(
   })
 
   if (!response.ok) {
-    throw new Error('HLS-Stream konnte nicht gestartet werden')
+    const error = await response.json().catch(() => null)
+
+    throw new Error(
+      error?.message ??
+      `HLS-Stream konnte nicht gestartet werden (${response.status})`
+    )
   }
 
   return response.json() as Promise<HlsSession>
 }
+
 
 
 /**
@@ -147,9 +154,15 @@ export interface HlsSession {
   playlistUrl: string
 }
 
+export type AudioMode =
+    | 'original'
+    | 'none'
+    | 'aac'
+
 export interface HlsStartRequest {
   path: string
   audioTrackIndex?: number | null
+  audioMode: AudioMode
 }
 
 export interface HlsAudioRequest {

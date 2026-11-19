@@ -63,3 +63,11 @@ export interface MediaMetadata {
   audioTracks: AudioTrack[]
   subtitleTracks: SubtitleTrack[]
 }
+
+export type AudioMode = 'AAC' | 'NONE'
+
+export interface HlsStartRequest {
+  path: string
+  audioTrackIndex?: number | null
+  audioMode: AudioMode
+}

@@ -2,6 +2,7 @@
 package de.setre.videostream.service;
 
 import de.setre.videostream.config.MediaProperties;
+import de.setre.videostream.dto.AudioMode;
 import de.setre.videostream.dto.HlsSessionDto;
 import de.setre.videostream.dto.MediaMetadataDto;
 
@@ -50,18 +51,24 @@ public class HlsStreamingService {
         final String id;
         final String relativePath;
         final Path directory;
+        final AudioMode audioMode;
 
+        volatile Integer audioTrackIndex;
         volatile Process process;
         volatile Instant lastAccess;
 
         HlsSession(
                 String id,
                 String relativePath,
-                Path directory) {
+                Path directory,
+                AudioMode audioMode,
+                Integer audioTrackIndex) {
 
             this.id = id;
             this.relativePath = relativePath;
             this.directory = directory;
+            this.audioMode = audioMode;
+            this.audioTrackIndex = audioTrackIndex;
             this.lastAccess = Instant.now();
         }
     }
@@ -71,22 +78,32 @@ public class HlsStreamingService {
      */
     public HlsSessionDto start(
             String relativePath,
-            Integer audioTrackIndex)
+            Integer audioTrackIndex,
+            AudioMode audioMode)
             throws IOException, InterruptedException {
+
+        if (audioMode == null) {
+            throw new IllegalArgumentException(
+                    "Audiomodus fehlt"
+            );
+        }
 
         Path videoPath =
                 mediaService.getVideoPath(relativePath);
 
-        MediaMetadataDto metadata =
-                metadataService.getMetadata(relativePath, null);
+        Integer selectedTrack = null;
 
-        Integer selectedTrack = audioTrackIndex;
+        if (audioMode == AudioMode.AAC) {
 
-        if (selectedTrack == null) {
-            selectedTrack = metadata.selectedAudioTrackIndex();
+            MediaMetadataDto metadata =
+                    metadataService.getMetadata(relativePath, null);
+
+            selectedTrack = audioTrackIndex != null
+                    ? audioTrackIndex
+                    : metadata.selectedAudioTrackIndex();
+
+            validateAudioTrack(metadata, selectedTrack);
         }
-
-        validateAudioTrack(metadata, selectedTrack);
 
         String sessionId = UUID.randomUUID().toString();
 
@@ -97,7 +114,9 @@ public class HlsStreamingService {
         HlsSession session = new HlsSession(
                 sessionId,
                 relativePath,
-                directory
+                directory,
+                audioMode,
+                selectedTrack
         );
 
         try {
@@ -108,8 +127,11 @@ public class HlsStreamingService {
                     session,
                     videoPath,
                     selectedTrack,
+                    audioMode,
                     0
             );
+
+            waitForPlaylist(session, 300);
 
             return new HlsSessionDto(
                     sessionId,
@@ -119,6 +141,7 @@ public class HlsStreamingService {
         } catch (Exception e) {
 
             sessions.remove(sessionId);
+            stopProcess(session.process);
             deleteDirectory(directory);
 
             throw e;
@@ -136,8 +159,15 @@ public class HlsStreamingService {
 
         HlsSession session = getSession(sessionId);
 
+        if (session.audioMode != AudioMode.AAC) {
+            throw new IllegalArgumentException(
+                    "Audiospurwechsel ist nur im AAC-Modus möglich"
+            );
+        }
+
         if (!Double.isFinite(positionSeconds)
                 || positionSeconds < 0) {
+
             throw new IllegalArgumentException(
                     "Ungültige Wiedergabeposition"
             );
@@ -160,12 +190,17 @@ public class HlsStreamingService {
 
         clearDirectory(session.directory);
 
+        session.audioTrackIndex = audioTrackIndex;
+
         startFfmpeg(
                 session,
                 videoPath,
                 audioTrackIndex,
+                AudioMode.AAC,
                 positionSeconds
         );
+
+        waitForPlaylist(session, 300);
 
         session.lastAccess = Instant.now();
 
@@ -175,13 +210,16 @@ public class HlsStreamingService {
         );
     }
 
+
+
     /**
      * Startet FFmpeg und erzeugt eine HLS-Playlist.
      */
     private void startFfmpeg(
             HlsSession session,
             Path videoPath,
-            int audioTrackIndex,
+            Integer audioTrackIndex,
+            AudioMode audioMode,
             double positionSeconds)
             throws IOException {
 
@@ -203,9 +241,8 @@ public class HlsStreamingService {
 
         command.add("-hide_banner");
         command.add("-loglevel");
-        command.add("warning");
+        command.add("info");
 
-        // Schnelles Springen zur gespeicherten Position.
         if (positionSeconds > 0) {
             command.add("-ss");
             command.add(String.format(
@@ -218,36 +255,48 @@ public class HlsStreamingService {
         command.add("-i");
         command.add(videoPath.toString());
 
-        // Erstes Videosignal übernehmen.
+        // Videostream unverändert übernehmen.
         command.add("-map");
         command.add("0:v:0");
 
-        // Gewünschte Audiospur anhand des globalen Index.
-        command.add("-map");
-        command.add("0:" + audioTrackIndex);
-
-        // Keine Untertitel oder zusätzlichen Datenströme.
-        command.add("-sn");
-        command.add("-dn");
-
-        // Video nicht neu kodieren.
         command.add("-c:v");
         command.add("copy");
 
-        command.add("-hls_playlist_type");
-        command.add("vod");
+        // Audiomodus festlegen.
+        if (audioMode == AudioMode.AAC) {
 
-        // Audio für HLS vereinheitlichen.
-        command.add("-c:a");
-        command.add("aac");
+            if (audioTrackIndex == null) {
+                throw new IllegalArgumentException(
+                        "Keine Audiospur ausgewählt"
+                );
+            }
 
-        command.add("-b:a");
-        command.add("192k");
+            command.add("-map");
+            command.add("0:" + audioTrackIndex);
 
-        command.add("-ac");
-        command.add("2");
+            command.add("-c:a");
+            command.add("aac");
 
-        // HLS-Ausgabe.
+            command.add("-b:a");
+            command.add("192k");
+
+            command.add("-ac");
+            command.add("2");
+
+        } else if (audioMode == AudioMode.NONE) {
+
+            command.add("-an");
+
+        } else {
+
+            throw new IllegalArgumentException(
+                    "Nicht unterstützter Audiomodus"
+            );
+        }
+
+        command.add("-sn");
+        command.add("-dn");
+
         command.add("-f");
         command.add("hls");
 
@@ -256,6 +305,9 @@ public class HlsStreamingService {
 
         command.add("-hls_list_size");
         command.add("0");
+
+        command.add("-hls_playlist_type");
+        command.add("vod");
 
         command.add("-hls_segment_filename");
         command.add(segmentPattern.toString());
@@ -273,6 +325,93 @@ public class HlsStreamingService {
         session.process = builder.start();
     }
 
+
+
+
+
+
+    private void waitForPlaylist(
+            HlsSession session,
+            long timeoutSeconds)
+            throws IOException, InterruptedException {
+
+        Path playlist = session.directory.resolve("master.m3u8");
+
+        long deadline = System.nanoTime()
+                + TimeUnit.SECONDS.toNanos(timeoutSeconds);
+
+        while (System.nanoTime() < deadline) {
+
+            Process process = session.process;
+
+            if (process == null) {
+                throw new IOException("FFmpeg-Prozess ist null");
+            }
+
+            // Zuerst prüfen, ob eine gültige Playlist existiert.
+            if (Files.isRegularFile(playlist)
+                    && Files.size(playlist) > 0) {
+
+                String content = Files.readString(playlist);
+
+                if (content.contains("#EXTM3U")
+                        && content.contains("#EXTINF:")) {
+
+                    // Playlist ist vorhanden.
+                    // Auch ein bereits beendeter FFmpeg-Prozess
+                    // kann erfolgreich gewesen sein.
+                    if (!process.isAlive() && process.exitValue() != 0) {
+                        throw new IOException(
+                                "FFmpeg wurde mit Fehler beendet.\n"
+                                        + "Exit-Code: " + process.exitValue()
+                                        + "\nLog:\n" + readFfmpegLog(session)
+                        );
+                    }
+
+                    return;
+                }
+            }
+
+            // Prozessende ohne gültige Playlist prüfen.
+            if (!process.isAlive()) {
+
+                int exitCode = process.exitValue();
+
+                throw new IOException(
+                        "FFmpeg wurde beendet, ohne eine gültige HLS-Playlist "
+                                + "zu erzeugen.\n"
+                                + "Exit-Code: " + exitCode
+                                + "\nPlaylist vorhanden: "
+                                + Files.exists(playlist)
+                                + "\nLog:\n" + readFfmpegLog(session)
+                );
+            }
+
+            Thread.sleep(200);
+        }
+
+        throw new IOException(
+                "Zeitüberschreitung beim Erzeugen der HLS-Playlist.\n"
+                        + readFfmpegLog(session)
+        );
+    }
+
+
+
+    private String readFfmpegLog(HlsSession session) {
+
+        Path logFile = session.directory.resolve("ffmpeg.log");
+
+        try {
+            if (Files.exists(logFile)) {
+                return Files.readString(logFile);
+            }
+        } catch (IOException e) {
+            return "FFmpeg-Log konnte nicht gelesen werden";
+        }
+
+        return "Kein FFmpeg-Log vorhanden";
+    }
     /**
      * Prüft, ob die angeforderte Audiospur existiert.
      */
@@ -440,4 +579,7 @@ public class HlsStreamingService {
             }
         });
     }
+
+
+
 }

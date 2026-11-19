@@ -295,7 +295,8 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
 
         const session = await startHlsSession({
           path: video.relativePath,
-          audioTrackIndex: metadata!.selectedAudioTrackIndex
+          audioTrackIndex: metadata!.selectedAudioTrackIndex,
+          audioMode: 'AAC'
         })
 
         sessionId = session.sessionId
@@ -353,13 +354,15 @@ function VideoPlayer({ video, onClose }: VideoPlayerProps) {
 
       } catch (error) {
 
-        console.error(error)
+        console.error('HLS-Start fehlgeschlagen:', error)
 
-        if (!cancelled) {
-          setHlsError(
-            'Der Videostream konnte nicht gestartet werden.'
-          )
-        }
+          if (!cancelled) {
+            setHlsError(
+              error instanceof Error
+                ? error.message
+                : 'Unbekannter Fehler beim Starten des Videostreams.'
+            )
+          }
 
         if (sessionId) {
           await stopHlsSession(sessionId)
